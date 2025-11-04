@@ -1,5 +1,3 @@
-"""Step 7: the same three tools, sent to OpenAI."""
-
 import json
 
 import openai

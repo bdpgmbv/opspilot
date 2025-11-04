@@ -1,5 +1,3 @@
-"""Step 6: two tools in one reply."""
-
 import anthropic
 
 from opspilot.config import MODEL, anthropic_key

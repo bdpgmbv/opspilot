@@ -2,11 +2,6 @@ import pytest
 
 from opspilot.tools import ToolError, calculator, run_tool
 
-"""pytest picks this up automatically. Turns off fake latency in tests."""
-
-import opspilot.tools as tools
-
-tools.FAKE_LATENCY_S = 0.0
 
 def test_basic_math():
     assert calculator("(2400 * 18.5) / 100") == "444.0"
@@ -79,3 +74,19 @@ def test_cannot_write_outside_the_workspace():
     text, is_error = run_tool("write_file", {"name": "../stolen.txt", "content": "x"})
     assert is_error is True
     assert "outside the workspace" in text
+
+
+def test_sql_select_works():
+    text, is_error = run_tool("sql_query", {"sql": "SELECT count(*) FROM demo.signups"})
+    assert is_error is False
+
+
+def test_sql_cannot_delete():
+    text, is_error = run_tool("sql_query", {"sql": "DELETE FROM demo.signups"})
+    assert is_error is True
+
+
+def test_sql_typo_gets_a_hint():
+    text, is_error = run_tool("sql_query", {"sql": "SELECT signup_dt FROM demo.signups LIMIT 1"})
+    assert is_error is True
+    assert "signup_date" in text

@@ -1,9 +1,8 @@
-"""Step 4: run the tool and send the answer back."""
-
 import anthropic
 
 from opspilot.config import MODEL, anthropic_key
-from opspilot.tools import CALCULATOR_SCHEMA, ToolError, calculator
+from opspilot.tools import ToolError, calculator
+from opspilot.tools.arithmetic import CALCULATOR_SCHEMA
 
 # QUESTION = "What is 18.5% of 2400?"
 # QUESTION = "What is 5 divided by 0?"

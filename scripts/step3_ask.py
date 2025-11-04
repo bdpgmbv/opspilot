@@ -1,10 +1,7 @@
-"""Step 3: send one tool to Claude and look at what comes back."""
-
 import anthropic
 
 from opspilot.config import MODEL, anthropic_key
-
-from opspilot.tools import CALCULATOR_SCHEMA
+from opspilot.tools.arithmetic import CALCULATOR_SCHEMA
 
 QUESTION = "What is 18.5% of 2400?"
 
