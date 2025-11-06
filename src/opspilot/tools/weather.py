@@ -1,27 +1,25 @@
 import time
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from opspilot.tools import base
 from opspilot.tools.base import ToolError, tool
 
-GET_WEATHER_SCHEMA = {
-    "name": "get_weather",
-    "description": (
-        "Get the current weather for a city. "
-        'Example: get_weather(city="Paris", unit="celsius")'
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "city": {"type": "string", "description": "City name, e.g. 'Paris'"},
-            "unit": {
-                "type": "string",
-                "enum": ["celsius", "fahrenheit"],
-                "description": "Temperature unit. Defaults to celsius.",
-            },
-        },
-        "required": ["city"],
-    },
-}
+DESCRIPTION = (
+    "Get the current weather for a city. "
+    'Example: get_weather(city="Paris", unit="celsius")'
+)
+
+
+class GetWeatherInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    city: str = Field(min_length=1, description="City name, e.g. 'Paris'")
+    unit: Literal["celsius", "fahrenheit"] = Field(
+        "celsius", description="Temperature unit. Defaults to celsius."
+    )
+
 
 _FAKE_WEATHER = {
     "paris": (14.0, "overcast"),
@@ -31,7 +29,7 @@ _FAKE_WEATHER = {
 }
 
 
-@tool(GET_WEATHER_SCHEMA)
+@tool("get_weather", DESCRIPTION, GetWeatherInput)
 def get_weather(city: str, unit: str = "celsius") -> str:
     time.sleep(base.FAKE_LATENCY_S)   # read at call time, so tests can turn it off
     key = city.split(",")[0].strip().lower()

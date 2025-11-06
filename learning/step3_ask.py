@@ -1,7 +1,7 @@
 import anthropic
 
 from opspilot.config import MODEL, anthropic_key
-from opspilot.tools.arithmetic import CALCULATOR_SCHEMA
+from opspilot.tools import REGISTRY
 
 QUESTION = "What is 18.5% of 2400?"
 
@@ -12,7 +12,7 @@ def main():
     response = client.messages.create(
         model=MODEL,
         max_tokens=1024,
-        tools=[CALCULATOR_SCHEMA],          # the menu
+        tools=[REGISTRY["calculator"]["schema"]],          # the menu
         messages=[{"role": "user", "content": QUESTION}],
     )
 

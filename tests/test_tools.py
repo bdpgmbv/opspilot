@@ -1,6 +1,7 @@
 import pytest
 
-from opspilot.tools import ToolError, calculator, run_tool
+from conftest import needs_postgres
+from opspilot.tools import REGISTRY, ToolError, calculator, run_tool
 
 
 def test_basic_math():
@@ -76,17 +77,75 @@ def test_cannot_write_outside_the_workspace():
     assert "outside the workspace" in text
 
 
+@needs_postgres
 def test_sql_select_works():
     text, is_error = run_tool("sql_query", {"sql": "SELECT count(*) FROM demo.signups"})
     assert is_error is False
 
 
+@needs_postgres
 def test_sql_cannot_delete():
     text, is_error = run_tool("sql_query", {"sql": "DELETE FROM demo.signups"})
     assert is_error is True
 
 
+@needs_postgres
 def test_sql_typo_gets_a_hint():
     text, is_error = run_tool("sql_query", {"sql": "SELECT signup_dt FROM demo.signups LIMIT 1"})
     assert is_error is True
     assert "signup_date" in text
+
+def test_rejects_a_number_above_the_maximum():
+    text, is_error = run_tool("search_web", {"query": "x", "limit": 500})
+    assert is_error is True
+    assert "limit" in text
+    assert "less than or equal to 10" in text
+
+
+def test_rejects_the_wrong_type():
+    text, is_error = run_tool("search_web", {"query": "x", "limit": "three"})
+    assert is_error is True
+    assert "limit" in text
+    assert "valid integer" in text
+
+
+def test_rejects_an_extra_argument():
+    text, is_error = run_tool("read_file", {"name": "fixture.txt", "oops": 1})
+    assert is_error is True
+    assert "oops" in text
+    assert "not permitted" in text
+
+
+def test_rejects_a_missing_argument():
+    text, is_error = run_tool("calculator", {})
+    assert is_error is True
+    assert "expression" in text
+    assert "required" in text.lower()
+
+
+def test_rejects_a_value_outside_the_enum():
+    text, is_error = run_tool("get_weather", {"city": "Paris", "unit": "kelvin"})
+    assert is_error is True
+    assert "celsius" in text
+
+
+def test_rejects_an_empty_string():
+    text, is_error = run_tool("sql_query", {"sql": ""})
+    assert is_error is True
+    assert "at least 1 character" in text
+
+
+def test_fills_in_the_default():
+    text, is_error = run_tool("search_web", {"query": "wal mode"})
+    assert is_error is False
+    assert len(text.splitlines()) == 3  # limit defaults to 3
+
+
+def test_schema_sent_to_claude_carries_the_rules():
+    schema = REGISTRY["search_web"]["schema"]["input_schema"]
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["limit"]["maximum"] == 10
+    assert schema["properties"]["limit"]["minimum"] == 1
+    assert schema["required"] == ["query"]
+    assert "title" not in schema  # stripped, it only costs tokens
+    assert "title" not in schema["properties"]["limit"]

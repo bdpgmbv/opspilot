@@ -93,6 +93,39 @@ def _print_result(block, text: str, is_error: bool) -> None:
     print(f"       -> {text[:LOG_PREVIEW_CHARS]}{cut}")
 
 
+def _final_answer(response) -> tuple[str, str] | None:
+    """Return (answer, stopped_because) when the model is finished, else None."""
+    if response.stop_reason == "end_turn":
+        return "".join(b.text for b in response.content if b.type == "text"), "answered"
+    if response.stop_reason != "tool_use":  # refusal, max_tokens, pause_turn
+        return f"[stopped: {response.stop_reason}]", response.stop_reason
+    return None
+
+
+def _handle_tool_calls(messages, response, run_id, step, approve_all, verbose) -> None:
+    """Run the model's tool calls and append both messages the API requires."""
+    messages.append({"role": "assistant", "content": response.content})  # verbatim
+
+    calls = [b for b in response.content if b.type == "tool_use"]
+    decisions = _decide_approvals(calls, approve_all)  # ask before any thread starts
+    outputs = _run_all(calls, decisions)
+
+    results = []
+    for block, (text, is_error) in zip(calls, outputs, strict=True):
+        if verbose:
+            _print_result(block, text, is_error)
+        results.append({
+            "type": "tool_result",
+            "tool_use_id": block.id,  # must match the tool_use
+            "content": text,
+            "is_error": is_error,
+        })
+        db.save_event(run_id, step, block.name, block.input,
+                      text, is_error, decisions[block.id])
+
+    messages.append({"role": "user", "content": results})  # all results, one message
+
+
 @observe(name="agent_run", as_type="agent")
 def run_agent(question: str, verbose: bool = True, approve_all: bool = False) -> Run:
     client = anthropic.Anthropic(api_key=anthropic_key())
@@ -130,36 +163,12 @@ def run_agent(question: str, verbose: bool = True, approve_all: bool = False) ->
                 print(f"\n--- step {step} --- {response.stop_reason} "
                       f"(running total ${spent():.4f})")
 
-            if response.stop_reason == "end_turn":
-                answer = "".join(b.text for b in response.content if b.type == "text")
-                stopped = "answered"
+            finished = _final_answer(response)
+            if finished is not None:
+                answer, stopped = finished
                 break
 
-            if response.stop_reason != "tool_use":  # refusal, max_tokens, pause_turn
-                answer = f"[stopped: {response.stop_reason}]"
-                stopped = response.stop_reason
-                break
-
-            messages.append({"role": "assistant", "content": response.content})  # verbatim
-
-            calls = [b for b in response.content if b.type == "tool_use"]
-            decisions = _decide_approvals(calls, approve_all)  # ask before any thread starts
-            outputs = _run_all(calls, decisions)
-
-            results = []
-            for block, (text, is_error) in zip(calls, outputs, strict=True):
-                if verbose:
-                    _print_result(block, text, is_error)
-                results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,  # must match the tool_use
-                    "content": text,
-                    "is_error": is_error,
-                })
-                db.save_event(run_id, step, block.name, block.input,
-                              text, is_error, decisions[block.id])
-
-            messages.append({"role": "user", "content": results})  # all results, one message
+            _handle_tool_calls(messages, response, run_id, step, approve_all, verbose)
 
     except BaseException as e:  # includes Ctrl-C
         stopped = "crashed"

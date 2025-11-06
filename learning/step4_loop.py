@@ -1,8 +1,7 @@
 import anthropic
 
 from opspilot.config import MODEL, anthropic_key
-from opspilot.tools import ToolError, calculator
-from opspilot.tools.arithmetic import CALCULATOR_SCHEMA
+from opspilot.tools import REGISTRY, ToolError, calculator
 
 # QUESTION = "What is 18.5% of 2400?"
 # QUESTION = "What is 5 divided by 0?"
@@ -17,7 +16,7 @@ def main():
     first = client.messages.create(
         model=MODEL,
         max_tokens=1024,
-        tools=[CALCULATOR_SCHEMA],
+        tools=[REGISTRY["calculator"]["schema"]],
         messages=messages,
     )
     print("turn 1 stop_reason:", first.stop_reason)
@@ -56,7 +55,7 @@ def main():
     second = client.messages.create(
         model=MODEL,
         max_tokens=1024,
-        tools=[CALCULATOR_SCHEMA],
+        tools=[REGISTRY["calculator"]["schema"]],
         messages=messages,
     )
     print("turn 2 stop_reason:", second.stop_reason)

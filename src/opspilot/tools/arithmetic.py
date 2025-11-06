@@ -1,26 +1,26 @@
 import ast
 import operator
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from opspilot.tools.base import ToolError, tool
 
-CALCULATOR_SCHEMA = {
-    "name": "calculator",
-    "description": (
-        "Evaluate an arithmetic expression and return the result. "
-        "Supports + - * / ** and parentheses. Numbers only, no variables. "
-        'Example: calculator(expression="(2400 * 18.5) / 100")'
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "expression": {
-                "type": "string",
-                "description": "Arithmetic expression, e.g. '(2400 * 18.5) / 100'",
-            }
-        },
-        "required": ["expression"],
-    },
-}
+DESCRIPTION = (
+    "Evaluate an arithmetic expression and return the result. "
+    "Supports + - * / ** and parentheses. Numbers only, no variables. "
+    'Example: calculator(expression="(2400 * 18.5) / 100")'
+)
+
+
+class CalculatorInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expression: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Arithmetic expression, e.g. '(2400 * 18.5) / 100'",
+    )
+
 
 _OPS = {
     ast.Add: operator.add,
@@ -29,10 +29,6 @@ _OPS = {
     ast.Div: operator.truediv,
     ast.Pow: operator.pow,
 }
-
-
-def expression_hint(node) -> str:
-    return type(node).__name__
 
 
 def _walk(node):
@@ -51,10 +47,10 @@ def _walk(node):
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
         return -_walk(node.operand)
 
-    raise ToolError(f"only plain arithmetic is allowed, got: {expression_hint(node)}")
+    raise ToolError(f"only plain arithmetic is allowed, got: {type(node).__name__}")
 
 
-@tool(CALCULATOR_SCHEMA)
+@tool("calculator", DESCRIPTION, CalculatorInput)
 def calculator(expression: str) -> str:
     try:
         tree = ast.parse(expression, mode="eval")

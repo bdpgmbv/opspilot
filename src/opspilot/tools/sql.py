@@ -1,31 +1,31 @@
 import psycopg
+from pydantic import BaseModel, ConfigDict, Field
 
 from opspilot.config import database_url_ro
 from opspilot.tools.base import ToolError, tool
 
-SQL_QUERY_SCHEMA = {
-    "name": "sql_query",
-    "description": (
-        "Run a read-only SQL SELECT on the analytics database. "
-        "Table: demo.signups(signup_date date, plan text, country text, source text). "
-        "Returns up to 50 rows as text. "
-        'Example: sql_query(sql="SELECT signup_date, count(*) FROM demo.signups '
-        'GROUP BY 1 ORDER BY 1 DESC LIMIT 7")'
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "sql": {"type": "string", "description": "A single SELECT statement"}
-        },
-        "required": ["sql"],
-    },
-}
+DESCRIPTION = (
+    "Run a read-only SQL SELECT on the analytics database. "
+    "Table: demo.signups(signup_date date, plan text, country text, source text). "
+    "Returns up to 50 rows as text. "
+    'Example: sql_query(sql="SELECT signup_date, count(*) FROM demo.signups '
+    'GROUP BY 1 ORDER BY 1 DESC LIMIT 7")'
+)
+
+
+class SqlQueryInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sql: str = Field(
+        min_length=1, max_length=4000, description="A single SELECT statement"
+    )
+
 
 MAX_ROWS = 50
 STATEMENT_TIMEOUT_MS = 5000
 
 
-@tool(SQL_QUERY_SCHEMA)
+@tool("sql_query", DESCRIPTION, SqlQueryInput)
 def sql_query(sql: str) -> str:
     url = database_url_ro()
 
